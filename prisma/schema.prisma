@@ -113,10 +113,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  activityLogs ActivityLog[]
-  arrests      ArrestOfficer[]
-  promotions   Promotion[]
-  warnings     Warning[]
+  activityLogs      ActivityLog[]
+  arrests           ArrestOfficer[]
+  promotions        Promotion[]
+  warnings          Warning[]
+  /// PTR evaluation requests where this user was picked as "Instrutor Alvo".
+  evaluationTargets EvalRequest[]   @relation("EvalRequestTarget")
 
   @@index([rank])
   @@index([status])
@@ -152,20 +154,29 @@ model ArrestOfficer {
 
 /// A pending request for a PTR (probationary officer evaluation).
 model EvalRequest {
-  id               String            @id @default(cuid())
-  studentName      String
-  studentPassport  String
-  startTime        String
-  endTime          String
-  date             String
-  dept             String
-  evaluatorTarget  String
-  status           EvalRequestStatus @default(PENDENTE)
-  createdAt        DateTime          @default(now())
+  id              String @id @default(cuid())
+  studentName     String
+  studentPassport String
+  startTime       String
+  endTime         String
+  date            String
+  dept            String
+  /// Denormalized display name of the target instructor, kept for
+  /// display/history even if the user's name changes later or the account
+  /// is removed. The authoritative identity is `evaluatorTargetId`.
+  evaluatorTarget String
+  /// FK to the User selected as "Instrutor Alvo". Nullable so existing rows
+  /// created before this field existed remain valid; only the exact user
+  /// referenced here may finalize this evaluation (see the finalize route).
+  evaluatorTargetId String?
+  status            EvalRequestStatus @default(PENDENTE)
+  createdAt         DateTime          @default(now())
 
-  completedEval CompletedEval?
+  evaluatorTargetUser User?          @relation("EvalRequestTarget", fields: [evaluatorTargetId], references: [id], onDelete: SetNull)
+  completedEval       CompletedEval?
 
   @@index([status])
+  @@index([evaluatorTargetId])
 }
 
 model CompletedEval {

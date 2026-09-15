@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClipboardCheck, Send } from "lucide-react";
 import type { EvalRequest, Question } from "@/generated/prisma";
+import type { RosterMember } from "@/lib/roster";
+import { resolveDisplayName } from "@/lib/display-name";
 import { useToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
-import { isGraduadosUp } from "@/lib/permissions";
-import { useViewAs } from "@/components/view-as-context";
+
+const GRADE_OPTIONS = Array.from({ length: 11 }, (_, i) => i); // 0..10
 
 const EMPTY_FORM = {
   studentName: "",
@@ -17,20 +19,24 @@ const EMPTY_FORM = {
   endTime: "",
   date: "",
   dept: "ROCAM",
-  evaluatorTarget: "",
+  evaluatorTargetId: "",
 };
 
 export function AvaliacoesClient({
   pendingRequests,
   questions,
+  instructors,
+  students,
+  currentUserId,
 }: {
   pendingRequests: EvalRequest[];
   questions: Question[];
+  instructors: RosterMember[];
+  students: RosterMember[];
+  currentUserId: string | null;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const { effectiveRank } = useViewAs();
-  const canReview = isGraduadosUp(effectiveRank);
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +54,10 @@ export function AvaliacoesClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("Falha ao enviar solicitação.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Falha ao enviar solicitação.");
+      }
       showToast("Solicitação de PTR enviada para a fila!", "success");
       setForm(EMPTY_FORM);
       router.refresh();
@@ -57,6 +66,15 @@ export function AvaliacoesClient({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleStudentSelect(id: string) {
+    const student = students.find((s) => s.id === id);
+    setForm((f) => ({
+      ...f,
+      studentName: student ? resolveDisplayName(student) : "",
+      studentPassport: student?.passport ?? "",
+    }));
   }
 
   function openEval(request: EvalRequest) {
@@ -80,7 +98,10 @@ export function AvaliacoesClient({
           })),
         }),
       });
-      if (!res.ok) throw new Error("Falha ao concluir avaliação.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Falha ao concluir avaliação.");
+      }
       showToast("Avaliação concluída e salva!", "success");
       setActiveRequest(null);
       router.refresh();
@@ -100,11 +121,34 @@ export function AvaliacoesClient({
         <form onSubmit={handleSubmitRequest} className="space-y-3">
           <div>
             <label className={labelClass}>Nome do Aluno *</label>
-            <input required value={form.studentName} onChange={(e) => setForm((f) => ({ ...f, studentName: e.target.value }))} className={inputClass} />
+            <select
+              required
+              value={students.find((s) => resolveDisplayName(s) === form.studentName)?.id ?? ""}
+              onChange={(e) => handleStudentSelect(e.target.value)}
+              className={inputClass}
+            >
+              <option value="" disabled>
+                Selecione um piloto probatório...
+              </option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {resolveDisplayName(s)} {s.passport ? `(${s.passport})` : ""}
+                </option>
+              ))}
+            </select>
+            {students.length === 0 && (
+              <p className="text-[11px] text-rocam-muted mt-1">Nenhum piloto probatório cadastrado.</p>
+            )}
           </div>
           <div>
             <label className={labelClass}>Passaporte do Aluno *</label>
-            <input required value={form.studentPassport} onChange={(e) => setForm((f) => ({ ...f, studentPassport: e.target.value }))} className={inputClass} />
+            <input
+              required
+              readOnly
+              value={form.studentPassport}
+              placeholder="Selecione o aluno acima"
+              className={`${inputClass} opacity-80 cursor-not-allowed`}
+            />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -128,7 +172,24 @@ export function AvaliacoesClient({
           </div>
           <div>
             <label className={labelClass}>Instrutor Alvo *</label>
-            <input required value={form.evaluatorTarget} onChange={(e) => setForm((f) => ({ ...f, evaluatorTarget: e.target.value }))} className={inputClass} />
+            <select
+              required
+              value={form.evaluatorTargetId}
+              onChange={(e) => setForm((f) => ({ ...f, evaluatorTargetId: e.target.value }))}
+              className={inputClass}
+            >
+              <option value="" disabled>
+                Selecione o instrutor...
+              </option>
+              {instructors.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {resolveDisplayName(i)}
+                </option>
+              ))}
+            </select>
+            {instructors.length === 0 && (
+              <p className="text-[11px] text-rocam-muted mt-1">Nenhum Graduado ou superior cadastrado.</p>
+            )}
           </div>
           <button type="submit" disabled={submitting} className={primaryButtonClass}>
             {submitting ? "Enviando..." : "Enviar Solicitação"}
@@ -144,29 +205,35 @@ export function AvaliacoesClient({
           {pendingRequests.length === 0 && (
             <p className="text-xs text-rocam-muted italic py-8 text-center">Nenhuma solicitação pendente.</p>
           )}
-          {pendingRequests.map((r) => (
-            <div key={r.id} className="p-3 bg-rocam-dark/80 rounded-xl border border-rocam-border text-xs space-y-2">
-              <div className="flex justify-between items-start gap-3">
-                <div>
-                  <h4 className="font-bold text-slate-100">
-                    {r.studentName} (ID: {r.studentPassport})
-                  </h4>
-                  <p className="text-rocam-muted">Instrutor: {r.evaluatorTarget}</p>
-                  <p className="text-rocam-muted">
-                    {r.date} • {r.startTime} – {r.endTime}
-                  </p>
+          {pendingRequests.map((r) => {
+            // Only the exact target instructor may evaluate this PTR — no
+            // Graduado+/Staff override (mirrors the server-side check in
+            // the finalize route).
+            const canReviewThis = !!currentUserId && r.evaluatorTargetId === currentUserId;
+            return (
+              <div key={r.id} className="p-3 bg-rocam-dark/80 rounded-xl border border-rocam-border text-xs space-y-2">
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <h4 className="font-bold text-slate-100">
+                      {r.studentName} (ID: {r.studentPassport})
+                    </h4>
+                    <p className="text-rocam-muted">Instrutor: {r.evaluatorTarget}</p>
+                    <p className="text-rocam-muted">
+                      {r.date} • {r.startTime} – {r.endTime}
+                    </p>
+                  </div>
+                  {canReviewThis && (
+                    <button
+                      onClick={() => openEval(r)}
+                      className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded shrink-0 cursor-pointer"
+                    >
+                      Avaliar PTR
+                    </button>
+                  )}
                 </div>
-                {canReview && (
-                  <button
-                    onClick={() => openEval(r)}
-                    className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded shrink-0 cursor-pointer"
-                  >
-                    Avaliar PTR
-                  </button>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -187,24 +254,36 @@ export function AvaliacoesClient({
                   <span className="text-xs font-semibold text-slate-100">
                     {idx + 1}. {q.text}
                   </span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={0}
-                      max={10}
-                      value={answers[idx]?.score ?? 10}
-                      onChange={(e) =>
-                        setAnswers((prev) => {
-                          const next = [...prev];
-                          next[idx] = { ...next[idx], score: Number(e.target.value) };
-                          return next;
-                        })
-                      }
-                      className="flex-1 accent-rocam-yellow"
-                    />
-                    <span className="w-8 text-right text-rocam-yellow font-bold text-xs">
-                      {answers[idx]?.score ?? 10}
-                    </span>
+                  <div className="flex flex-wrap gap-1">
+                    {GRADE_OPTIONS.map((grade) => {
+                      const selected = (answers[idx]?.score ?? 10) === grade;
+                      return (
+                        <label
+                          key={grade}
+                          className={`flex items-center justify-center w-7 h-7 rounded-lg border text-[11px] font-bold cursor-pointer transition-colors ${
+                            selected
+                              ? "bg-rocam-yellow text-rocam-dark border-rocam-yellow"
+                              : "bg-rocam-hover text-slate-300 border-rocam-border hover:border-rocam-yellow/50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`score-${q.id}`}
+                            value={grade}
+                            checked={selected}
+                            onChange={() =>
+                              setAnswers((prev) => {
+                                const next = [...prev];
+                                next[idx] = { ...next[idx], score: grade };
+                                return next;
+                              })
+                            }
+                            className="sr-only"
+                          />
+                          {grade}
+                        </label>
+                      );
+                    })}
                   </div>
                   <input
                     type="text"

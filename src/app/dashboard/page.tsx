@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { rosterSelect, onboardedFilter } from "@/lib/roster";
-import { resolveDisplayName } from "@/lib/display-name";
 import { RANK_EMOJI, RANK_LABELS, RANK_ORDER } from "@/lib/permissions";
+import { RecentArrests } from "@/components/dashboard/recent-arrests";
 
 async function getDashboardData() {
   const [
@@ -106,33 +106,7 @@ export default async function DashboardPage() {
               Ver Todos <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="space-y-3">
-            {recentArrests.length === 0 && (
-              <p className="text-xs text-rocam-muted italic py-8 text-center">
-                Nenhum registro prisional ainda.
-              </p>
-            )}
-            {recentArrests.map((a) => (
-              <div
-                key={a.id}
-                className="p-4 bg-rocam-dark/70 rounded-xl border border-rocam-border flex items-center justify-between text-xs"
-              >
-                <div>
-                  <h4 className="font-bold text-slate-100">{a.qru || "Ocorrência"}</h4>
-                  <p className="text-rocam-muted">
-                    BO: {a.bo} | Oficiais: {a.officers.map((o) => resolveDisplayName(o.user)).join(", ") || "—"}
-                  </p>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded font-bold ${
-                    a.outcome === "SUCESSO" ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
-                  }`}
-                >
-                  {a.outcome === "SUCESSO" ? "Sucesso" : "Sem Sucesso"}
-                </span>
-              </div>
-            ))}
-          </div>
+          <RecentArrests arrests={recentArrests} />
         </div>
 
         <div className="space-y-6">

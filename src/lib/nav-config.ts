@@ -43,7 +43,9 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/dashboard/detalhes-avaliacoes",
     label: "Dossiê de Avaliações",
     icon: FileSearch,
-    requires: Rank.SUPERVISOR,
+    // Finished PTR reports are visible to Graduado and up ("UP"), not just
+    // Supervisor+ — mirrors isGraduadosUp().
+    requires: Rank.GRADUADOS,
   },
   {
     id: "alteracoes",
