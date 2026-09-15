@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: "ROCAM — Metroville RP | Portal de Acesso Restrito",
   description:
     "Sistema restrito da Polícia Militar — Rondas Ostensivas com Apoio de Motocicletas — Metroville RP",
+  icons: {
+    icon: [{ url: "/rocam-logo.png", type: "image/png" }],
+    apple: "/rocam-logo.png",
+  },
 };
 
 export default function RootLayout({
