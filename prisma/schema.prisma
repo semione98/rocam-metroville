@@ -115,6 +115,7 @@ model User {
 
   activityLogs      ActivityLog[]
   arrests           ArrestOfficer[]
+  createdArrests    Arrest[]        @relation("ArrestCreator")
   promotions        Promotion[]
   warnings          Warning[]
   /// PTR evaluation requests where this user was picked as "Instrutor Alvo".
@@ -134,11 +135,18 @@ model Arrest {
   imageUrl     String?
   date         DateTime      @default(now())
   createdAt    DateTime      @default(now())
+  /// The user who submitted this arrest record via POST /api/arrests. Null
+  /// for rows created before this field existed. Not shown as a participant
+  /// on the arrest itself — used only for prisional performance metrics,
+  /// which credit the creator in addition to `officers`.
+  createdById  String?
 
-  officers ArrestOfficer[]
+  officers  ArrestOfficer[]
+  createdBy User?           @relation("ArrestCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([outcome])
   @@index([date])
+  @@index([createdById])
 }
 
 /// Join table: many-to-many between Arrest and User (participants).
