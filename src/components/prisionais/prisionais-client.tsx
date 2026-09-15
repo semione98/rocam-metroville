@@ -3,18 +3,12 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle, Search } from "lucide-react";
-import type { Prisma } from "@/generated/prisma";
 import type { RosterMember } from "@/lib/roster";
 import { resolveDisplayName } from "@/lib/display-name";
 import { useToast } from "@/components/ui/toast";
+import { ArrestDetailModal } from "@/components/prisionais/arrest-detail-modal";
+import type { ArrestWithOfficers } from "@/components/prisionais/arrest-types";
 import { inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
-
-type ArrestWithOfficers = Omit<
-  Prisma.ArrestGetPayload<{ include: { officers: true } }>,
-  "officers"
-> & {
-  officers: { arrestId: string; userId: string; user: RosterMember }[];
-};
 
 const EMPTY_FORM = {
   qru: "",
@@ -36,6 +30,7 @@ export function PrisionaisClient({
   const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
+  const [selectedArrest, setSelectedArrest] = useState<ArrestWithOfficers | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [selectedOfficerIds, setSelectedOfficerIds] = useState<string[]>([]);
   const [officerFilter, setOfficerFilter] = useState("");
@@ -229,9 +224,11 @@ export function PrisionaisClient({
         </div>
         <div className="space-y-3 max-h-[70vh] overflow-y-auto">
           {filteredArrests.map((a) => (
-            <div
+            <button
               key={a.id}
-              className="p-4 bg-rocam-dark/70 rounded-xl border border-rocam-border flex items-center justify-between text-xs gap-3"
+              type="button"
+              onClick={() => setSelectedArrest(a)}
+              className="w-full text-left p-4 bg-rocam-dark/70 rounded-xl border border-rocam-border flex items-center justify-between text-xs gap-3 cursor-pointer hover:border-rocam-yellow/50 transition-colors"
             >
               <div className="min-w-0">
                 <h4 className="font-bold text-slate-100 truncate">{a.qru || "Ocorrência"}</h4>
@@ -247,13 +244,15 @@ export function PrisionaisClient({
               >
                 {a.outcome === "SUCESSO" ? "Sucesso" : "Sem Sucesso"}
               </span>
-            </div>
+            </button>
           ))}
           {filteredArrests.length === 0 && (
             <p className="text-xs text-rocam-muted italic py-8 text-center">Nenhum registro encontrado.</p>
           )}
         </div>
       </div>
+
+      <ArrestDetailModal arrest={selectedArrest} onClose={() => setSelectedArrest(null)} />
     </section>
   );
 }

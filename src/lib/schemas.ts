@@ -29,6 +29,9 @@ export const arrestSchema = z.object({
   userIds: z.array(z.string()).min(1, "Selecione ao menos um oficial"),
 });
 
+/** `evaluatorTarget` (display name) is intentionally NOT accepted from the
+ * client — it's derived server-side from the looked-up `evaluatorTargetId`
+ * so a caller can't spoof the instructor's name (see /api/eval-requests). */
 export const evalRequestSchema = z.object({
   studentName: z.string().trim().min(1),
   studentPassport: z.string().trim().min(1),
@@ -36,7 +39,7 @@ export const evalRequestSchema = z.object({
   endTime: z.string().trim().min(1),
   date: z.string().trim().min(1),
   dept: z.string().trim().min(1),
-  evaluatorTarget: z.string().trim().min(1),
+  evaluatorTargetId: z.string().trim().min(1),
 });
 
 export const finalizeEvalSchema = z.object({
