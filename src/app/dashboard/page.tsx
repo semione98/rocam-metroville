@@ -9,11 +9,13 @@ import {
   ArrowRight,
   Award,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { rosterSelect, onboardedFilter } from "@/lib/roster";
 import { RANK_EMOJI, RANK_LABELS, RANK_ORDER } from "@/lib/permissions";
 import { RecentArrests } from "@/components/dashboard/recent-arrests";
+import { getArrestPerformance } from "@/lib/arrest-metrics";
 
 async function getDashboardData() {
   const [
@@ -25,6 +27,7 @@ async function getDashboardData() {
     recentArrests,
     officersByRank,
     recentPromotions,
+    arrestPerformance,
   ] = await Promise.all([
     prisma.user.count({ where: { ...onboardedFilter, status: "ATIVO" } }),
     prisma.arrest.count({ where: { outcome: "SUCESSO" } }),
@@ -38,6 +41,7 @@ async function getDashboardData() {
     }),
     prisma.user.groupBy({ by: ["rank"], where: onboardedFilter, _count: { rank: true } }),
     prisma.promotion.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
+    getArrestPerformance(),
   ]);
 
   const rankCounts = new Map(officersByRank.map((r) => [r.rank, r._count.rank]));
@@ -47,6 +51,7 @@ async function getDashboardData() {
     recentArrests,
     rankCounts,
     recentPromotions,
+    arrestPerformance,
   };
 }
 
@@ -67,8 +72,9 @@ const COLOR_CLASSES: Record<string, { text: string; bg: string; border: string }
 };
 
 export default async function DashboardPage() {
-  const { stats, recentArrests, rankCounts, recentPromotions } = await getDashboardData();
+  const { stats, recentArrests, rankCounts, recentPromotions, arrestPerformance } = await getDashboardData();
   const totalOfficers = Array.from(rankCounts.values()).reduce((a, b) => a + b, 0) || 1;
+  const { rows: performanceRows, topSucesso } = arrestPerformance;
 
   return (
     <section className="space-y-6">
@@ -91,6 +97,52 @@ export default async function DashboardPage() {
             </div>
           );
         })}
+      </div>
+
+      <div className="bg-rocam-card p-5 rounded-xl border border-rocam-border space-y-4">
+        <div className="flex items-center justify-between border-b border-rocam-border pb-3 flex-wrap gap-2">
+          <h3 className="font-oswald text-base font-bold text-slate-200 flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-rocam-yellow" /> DESEMPENHO PRISIONAL
+          </h3>
+          {topSucesso && (
+            <p className="text-xs text-slate-300">
+              Mais prisões com sucesso:{" "}
+              <span className="text-rocam-yellow font-bold">{topSucesso.displayName}</span>{" "}
+              <span className="text-rocam-muted">({topSucesso.sucesso})</span>
+            </p>
+          )}
+        </div>
+
+        {performanceRows.length === 0 ? (
+          <p className="text-rocam-muted italic py-4 text-center text-sm">
+            Nenhum oficial com prisionais registrados ainda.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-rocam-muted uppercase tracking-wider text-left border-b border-rocam-border">
+                  <th className="py-2 pr-4 font-semibold">Oficial</th>
+                  <th className="py-2 px-4 font-semibold text-right">Sucesso</th>
+                  <th className="py-2 px-4 font-semibold text-right">Falhos</th>
+                  <th className="py-2 px-4 font-semibold text-right">% Sucesso</th>
+                  <th className="py-2 pl-4 font-semibold text-right">% Falha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {performanceRows.map((row) => (
+                  <tr key={row.userId} className="border-b border-rocam-border/50 last:border-0">
+                    <td className="py-2 pr-4 text-slate-200 font-semibold">{row.displayName}</td>
+                    <td className="py-2 px-4 text-right text-emerald-400 font-bold">{row.sucesso}</td>
+                    <td className="py-2 px-4 text-right text-rose-400 font-bold">{row.falha}</td>
+                    <td className="py-2 px-4 text-right text-slate-300">{row.sucessoPct}%</td>
+                    <td className="py-2 pl-4 text-right text-slate-300">{row.falhaPct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -26,6 +26,7 @@ export const POST = withApiErrorHandling(async (req) => {
       unidade: body.unidade,
       outcome: body.outcome,
       imageUrl: body.imageUrl || null,
+      createdById: actor.id,
       officers: { create: body.userIds.map((userId) => ({ userId })) },
     },
     include: { officers: { include: { user: { select: rosterSelect } } } },
