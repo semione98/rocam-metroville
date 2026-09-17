@@ -1,11 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { resolveDisplayName } from "@/lib/display-name";
+import { canEditPrisionalRecord } from "@/lib/permissions";
+import type { RosterMember } from "@/lib/roster";
+import { useViewAs } from "@/components/view-as-context";
 import { ArrestDetailModal } from "@/components/prisionais/arrest-detail-modal";
 import type { ArrestWithOfficers } from "@/components/prisionais/arrest-types";
 
-export function RecentArrests({ arrests }: { arrests: ArrestWithOfficers[] }) {
+export function RecentArrests({
+  arrests,
+  officers,
+  currentUserId,
+}: {
+  arrests: ArrestWithOfficers[];
+  officers: RosterMember[];
+  currentUserId: string | null;
+}) {
+  const router = useRouter();
+  const { effectiveRank } = useViewAs();
   const [selectedArrest, setSelectedArrest] = useState<ArrestWithOfficers | null>(null);
 
   if (arrests.length === 0) {
@@ -43,7 +57,24 @@ export function RecentArrests({ arrests }: { arrests: ArrestWithOfficers[] }) {
         ))}
       </div>
 
-      <ArrestDetailModal arrest={selectedArrest} onClose={() => setSelectedArrest(null)} />
+      <ArrestDetailModal
+        arrest={selectedArrest}
+        officers={officers}
+        canEdit={
+          !!selectedArrest &&
+          !!currentUserId &&
+          canEditPrisionalRecord({ id: currentUserId, rank: effectiveRank }, selectedArrest.createdById)
+        }
+        onClose={() => setSelectedArrest(null)}
+        onSaved={(updated) => {
+          setSelectedArrest(updated);
+          router.refresh();
+        }}
+        onDeleted={() => {
+          setSelectedArrest(null);
+          router.refresh();
+        }}
+      />
     </>
   );
 }
