@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { rosterSelect, onboardedFilter } from "@/lib/roster";
 import { RANK_EMOJI, RANK_LABELS, RANK_ORDER } from "@/lib/permissions";
@@ -28,6 +29,7 @@ async function getDashboardData() {
     officersByRank,
     recentPromotions,
     arrestPerformance,
+    officers,
   ] = await Promise.all([
     prisma.user.count({ where: { ...onboardedFilter, status: "ATIVO" } }),
     prisma.arrest.count({ where: { outcome: "SUCESSO" } }),
@@ -42,6 +44,11 @@ async function getDashboardData() {
     prisma.user.groupBy({ by: ["rank"], where: onboardedFilter, _count: { rank: true } }),
     prisma.promotion.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
     getArrestPerformance(),
+    prisma.user.findMany({
+      where: onboardedFilter,
+      select: rosterSelect,
+      orderBy: { characterName: "asc" },
+    }),
   ]);
 
   const rankCounts = new Map(officersByRank.map((r) => [r.rank, r._count.rank]));
@@ -52,6 +59,7 @@ async function getDashboardData() {
     rankCounts,
     recentPromotions,
     arrestPerformance,
+    officers,
   };
 }
 
@@ -72,7 +80,8 @@ const COLOR_CLASSES: Record<string, { text: string; bg: string; border: string }
 };
 
 export default async function DashboardPage() {
-  const { stats, recentArrests, rankCounts, recentPromotions, arrestPerformance } = await getDashboardData();
+  const [session, { stats, recentArrests, rankCounts, recentPromotions, arrestPerformance, officers }] =
+    await Promise.all([auth(), getDashboardData()]);
   const totalOfficers = Array.from(rankCounts.values()).reduce((a, b) => a + b, 0) || 1;
   const { rows: performanceRows, topSucesso } = arrestPerformance;
 
@@ -158,7 +167,11 @@ export default async function DashboardPage() {
               Ver Todos <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <RecentArrests arrests={recentArrests} />
+          <RecentArrests
+            arrests={recentArrests}
+            officers={officers}
+            currentUserId={session?.user?.id ?? null}
+          />
         </div>
 
         <div className="space-y-6">

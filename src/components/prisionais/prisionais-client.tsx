@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Search } from "lucide-react";
+import { Pencil, PlusCircle, Search } from "lucide-react";
 import type { RosterMember } from "@/lib/roster";
 import { resolveDisplayName } from "@/lib/display-name";
+import { canEditPrisionalRecord } from "@/lib/permissions";
+import { useViewAs } from "@/components/view-as-context";
 import { useToast } from "@/components/ui/toast";
 import { ArrestDetailModal } from "@/components/prisionais/arrest-detail-modal";
 import type { ArrestWithOfficers } from "@/components/prisionais/arrest-types";
@@ -22,12 +24,15 @@ const EMPTY_FORM = {
 export function PrisionaisClient({
   initialArrests,
   officers,
+  currentUserId,
 }: {
   initialArrests: ArrestWithOfficers[];
   officers: RosterMember[];
+  currentUserId: string | null;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
+  const { effectiveRank } = useViewAs();
 
   const [search, setSearch] = useState("");
   const [selectedArrest, setSelectedArrest] = useState<ArrestWithOfficers | null>(null);
@@ -237,13 +242,19 @@ export function PrisionaisClient({
                 </p>
                 <p className="text-rocam-muted">{new Date(a.date).toLocaleDateString("pt-BR")}</p>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded font-bold shrink-0 ${
-                  a.outcome === "SUCESSO" ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
-                }`}
-              >
-                {a.outcome === "SUCESSO" ? "Sucesso" : "Sem Sucesso"}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                {currentUserId &&
+                  canEditPrisionalRecord({ id: currentUserId, rank: effectiveRank }, a.createdById) && (
+                    <Pencil className="w-3.5 h-3.5 text-rocam-yellow" />
+                  )}
+                <span
+                  className={`px-2 py-0.5 rounded font-bold ${
+                    a.outcome === "SUCESSO" ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
+                  }`}
+                >
+                  {a.outcome === "SUCESSO" ? "Sucesso" : "Sem Sucesso"}
+                </span>
+              </div>
             </button>
           ))}
           {filteredArrests.length === 0 && (
@@ -252,7 +263,24 @@ export function PrisionaisClient({
         </div>
       </div>
 
-      <ArrestDetailModal arrest={selectedArrest} onClose={() => setSelectedArrest(null)} />
+      <ArrestDetailModal
+        arrest={selectedArrest}
+        officers={officers}
+        canEdit={
+          !!selectedArrest &&
+          !!currentUserId &&
+          canEditPrisionalRecord({ id: currentUserId, rank: effectiveRank }, selectedArrest.createdById)
+        }
+        onClose={() => setSelectedArrest(null)}
+        onSaved={(updated) => {
+          setSelectedArrest(updated);
+          router.refresh();
+        }}
+        onDeleted={() => {
+          setSelectedArrest(null);
+          router.refresh();
+        }}
+      />
     </section>
   );
 }
