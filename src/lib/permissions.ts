@@ -62,6 +62,16 @@ export function isSupervisorUp(rank: Rank): boolean {
   return isAtLeast(rank, Rank.SUPERVISOR);
 }
 
+/** Registro prisional: the reporter (`createdById`) or Supervisor and up
+ * may edit or delete the record. */
+export function canEditPrisionalRecord(
+  actor: { id: string; rank: Rank },
+  createdById: string | null | undefined
+): boolean {
+  if (isSupervisorUp(actor.rank)) return true;
+  return !!createdById && createdById === actor.id;
+}
+
 /** True for anyone above a Probatório — used to gate reviewing/scoring PTR
  * evaluations (a Probatório shouldn't be able to score their own or a
  * peer's evaluation). */
