@@ -26,7 +26,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "efetivo", href: "/dashboard/efetivo", label: "Hierarquia & Efetivo", icon: Users },
-  { id: "prisionais", href: "/dashboard/prisionais", label: "Prisões com Sucesso", icon: Lock },
+  { id: "prisionais", href: "/dashboard/prisionais", label: "Registro Prisional", icon: Lock },
   { id: "fardamentos", href: "/dashboard/fardamentos", label: "Fardamentos ROCAM", icon: Shirt },
   { id: "avaliacoes", href: "/dashboard/avaliacoes", label: "Relatórios de Probatórios", icon: ClipboardCheck },
   { id: "ausencias", href: "/dashboard/ausencias", label: "Registro de Ausência", icon: CalendarOff },
@@ -59,6 +59,6 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/dashboard/staff-panel",
     label: "Painel Staff & Coordenação",
     icon: Crown,
-    requires: "staff",
+    requires: Rank.SUPERVISOR,
   },
 ];
