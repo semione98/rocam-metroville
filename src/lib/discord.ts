@@ -71,3 +71,49 @@ export async function fetchGuildMember(
 
   return (await res.json()) as DiscordGuildMember;
 }
+
+/**
+ * Posts a plain text message to a channel using the Discord Bot Token.
+ * Never throws — logs and returns `false` on failure so a Discord outage
+ * never blocks the caller's primary action (e.g. sending a PTR reminder).
+ */
+export async function sendChannelMessage(
+  channelId: string,
+  content: string
+): Promise<boolean> {
+  const botToken = process.env.DISCORD_BOT_TOKEN;
+
+  if (!botToken) {
+    console.error("[discord] DISCORD_BOT_TOKEN não configurado.");
+    return false;
+  }
+
+  try {
+    const res = await fetch(
+      `https://discord.com/api/v10/channels/${channelId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content }),
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      console.error(
+        `[discord] Falha ao enviar mensagem no canal ${channelId} (status ${res.status}): ${await res
+          .text()
+          .catch(() => "")}`
+      );
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error("[discord] Erro de rede ao enviar mensagem no canal.", err);
+    return false;
+  }
+}
