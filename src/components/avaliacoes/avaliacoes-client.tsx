@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, Send } from "lucide-react";
+import { Bell, ClipboardCheck, Send } from "lucide-react";
 import type { EvalRequest, Question } from "@/generated/prisma";
 import type { RosterMember } from "@/lib/roster";
 import { resolveDisplayName } from "@/lib/display-name";
@@ -44,6 +44,7 @@ export function AvaliacoesClient({
   const [activeRequest, setActiveRequest] = useState<EvalRequest | null>(null);
   const [answers, setAnswers] = useState<{ score: number; comment: string }[]>([]);
   const [finalizing, setFinalizing] = useState(false);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
 
   async function handleSubmitRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +76,24 @@ export function AvaliacoesClient({
       studentName: student ? resolveDisplayName(student) : "",
       studentPassport: student?.passport ?? "",
     }));
+  }
+
+  async function handleRemind(request: EvalRequest) {
+    setRemindingId(request.id);
+    try {
+      const res = await fetch(`/api/eval-requests/${request.id}/remind`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Falha ao enviar lembrete.");
+      }
+      showToast(`Lembrete enviado para ${request.evaluatorTarget}!`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Erro ao enviar lembrete.", "error");
+    } finally {
+      setRemindingId(null);
+    }
   }
 
   function openEval(request: EvalRequest) {
@@ -222,14 +241,25 @@ export function AvaliacoesClient({
                       {r.date} • {r.startTime} – {r.endTime}
                     </p>
                   </div>
-                  {canReviewThis && (
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => openEval(r)}
-                      className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded shrink-0 cursor-pointer"
+                      onClick={() => handleRemind(r)}
+                      disabled={remindingId === r.id}
+                      title="Enviar lembrete no Discord para o instrutor alvo"
+                      className="px-3 py-1.5 bg-rocam-yellow/20 text-rocam-yellow font-bold rounded flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Avaliar PTR
+                      <Bell className="w-3.5 h-3.5" />
+                      {remindingId === r.id ? "Enviando..." : "Lembrar Instrutor"}
                     </button>
-                  )}
+                    {canReviewThis && (
+                      <button
+                        onClick={() => openEval(r)}
+                        className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded cursor-pointer"
+                      >
+                        Avaliar PTR
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
