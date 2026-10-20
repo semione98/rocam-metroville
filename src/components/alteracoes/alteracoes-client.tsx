@@ -15,6 +15,7 @@ const CATEGORIES = [
   "PROMOCAO",
   "PUNICAO",
   "FARDAMENTO",
+  "ACAO",
 ] as const;
 
 type LogWithUser = ActivityLog & { user: User | null };

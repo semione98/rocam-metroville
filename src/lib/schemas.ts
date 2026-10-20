@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ArrestOutcome, OfficerStatus, Rank, RequestStatus, WarningLevel } from "@/generated/prisma";
+import { ArrestOutcome, HeistKind, HeistOutcome, OfficerStatus, Rank, RequestStatus, WarningLevel } from "@/generated/prisma";
 
 /** Mandatory first-login form (src/app/onboarding). Rank is never included
  * here — it always comes from the Discord role sync. */
@@ -27,6 +27,21 @@ export const arrestSchema = z.object({
   outcome: z.enum(ArrestOutcome).default("SUCESSO"),
   imageUrl: z.string().trim().optional().default(""),
   userIds: z.array(z.string()).min(1, "Selecione ao menos um oficial"),
+});
+
+export const heistSchema = z.object({
+  name: z.string().trim().min(1, "Nome da ação obrigatório"),
+  kind: z.enum(HeistKind),
+  outcome: z.enum(HeistOutcome),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida")
+    .refine((v) => {
+      const [y, m, d] = v.split("-").map(Number);
+      const parsed = new Date(Date.UTC(y, m - 1, d));
+      return parsed.getUTCFullYear() === y && parsed.getUTCMonth() === m - 1 && parsed.getUTCDate() === d;
+    }, "Data inválida"),
+  userIds: z.array(z.string().trim().min(1)).max(100).default([]),
 });
 
 /** `evaluatorTarget` (display name) is intentionally NOT accepted from the

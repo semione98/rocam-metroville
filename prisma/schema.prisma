@@ -40,6 +40,16 @@ enum ArrestOutcome {
   SEM_SUCESSO
 }
 
+enum HeistKind {
+  CONFRONTO_ARMADO
+  PERSEGUICAO
+}
+
+enum HeistOutcome {
+  VITORIA
+  DERROTA
+}
+
 enum RequestStatus {
   PENDENTE
   APROVADO
@@ -67,6 +77,7 @@ enum ActivityLogType {
   PROMOCAO
   PUNICAO
   FARDAMENTO
+  ACAO
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +127,8 @@ model User {
   activityLogs      ActivityLog[]
   arrests           ArrestOfficer[]
   createdArrests    Arrest[]        @relation("ArrestCreator")
+  heists            HeistOfficer[]
+  createdHeists     Heist[]         @relation("HeistCreator")
   promotions        Promotion[]
   warnings          Warning[]
   /// PTR evaluation requests where this user was picked as "Instrutor Alvo".
@@ -147,6 +160,36 @@ model Arrest {
   @@index([outcome])
   @@index([date])
   @@index([createdById])
+}
+
+/// A registered "Ação" (heist / conflict) involving ROCAM officers.
+model Heist {
+  id          String       @id @default(cuid())
+  name        String
+  kind        HeistKind
+  outcome     HeistOutcome
+  date        DateTime
+  createdAt   DateTime     @default(now())
+  createdById String?
+
+  officers  HeistOfficer[]
+  createdBy User?          @relation("HeistCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([kind])
+  @@index([outcome])
+  @@index([date])
+  @@index([createdById])
+}
+
+/// Join table: many-to-many between Heist and User (participants).
+model HeistOfficer {
+  heistId String
+  userId  String
+
+  heist Heist @relation(fields: [heistId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([heistId, userId])
 }
 
 /// Join table: many-to-many between Arrest and User (participants).

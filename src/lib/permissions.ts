@@ -62,14 +62,29 @@ export function isSupervisorUp(rank: Rank): boolean {
   return isAtLeast(rank, Rank.SUPERVISOR);
 }
 
+/** The reporter (`createdById`) or Supervisor and up may mutate the record. */
+export function canEditOwnOrSupervisorUp(
+  actor: { id: string; rank: Rank },
+  createdById: string | null | undefined
+): boolean {
+  if (isSupervisorUp(actor.rank)) return true;
+  return !!createdById && createdById === actor.id;
+}
+
 /** Registro prisional: the reporter (`createdById`) or Supervisor and up
  * may edit or delete the record. */
 export function canEditPrisionalRecord(
   actor: { id: string; rank: Rank },
   createdById: string | null | undefined
 ): boolean {
-  if (isSupervisorUp(actor.rank)) return true;
-  return !!createdById && createdById === actor.id;
+  return canEditOwnOrSupervisorUp(actor, createdById);
+}
+
+export function canEditHeistRecord(
+  actor: { id: string; rank: Rank },
+  createdById: string | null | undefined
+): boolean {
+  return canEditOwnOrSupervisorUp(actor, createdById);
 }
 
 /** True for anyone above a Probatório — used to gate reviewing/scoring PTR
