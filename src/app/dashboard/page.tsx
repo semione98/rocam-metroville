@@ -10,6 +10,7 @@ import {
   Award,
   TrendingUp,
   Trophy,
+  Siren,
 } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -17,6 +18,7 @@ import { rosterSelect, onboardedFilter } from "@/lib/roster";
 import { RANK_EMOJI, RANK_LABELS, RANK_ORDER } from "@/lib/permissions";
 import { RecentArrests } from "@/components/dashboard/recent-arrests";
 import { getArrestPerformance } from "@/lib/arrest-metrics";
+import { getHeistPerformance } from "@/lib/heist-metrics";
 
 async function getDashboardData() {
   const [
@@ -29,6 +31,7 @@ async function getDashboardData() {
     officersByRank,
     recentPromotions,
     arrestPerformance,
+    heistPerformance,
     officers,
   ] = await Promise.all([
     prisma.user.count({ where: { ...onboardedFilter, status: "ATIVO" } }),
@@ -44,6 +47,7 @@ async function getDashboardData() {
     prisma.user.groupBy({ by: ["rank"], where: onboardedFilter, _count: { rank: true } }),
     prisma.promotion.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
     getArrestPerformance(),
+    getHeistPerformance(),
     prisma.user.findMany({
       where: onboardedFilter,
       select: rosterSelect,
@@ -59,6 +63,7 @@ async function getDashboardData() {
     rankCounts,
     recentPromotions,
     arrestPerformance,
+    heistPerformance,
     officers,
   };
 }
@@ -80,10 +85,13 @@ const COLOR_CLASSES: Record<string, { text: string; bg: string; border: string }
 };
 
 export default async function DashboardPage() {
-  const [session, { stats, recentArrests, rankCounts, recentPromotions, arrestPerformance, officers }] =
-    await Promise.all([auth(), getDashboardData()]);
+  const [
+    session,
+    { stats, recentArrests, rankCounts, recentPromotions, arrestPerformance, heistPerformance, officers },
+  ] = await Promise.all([auth(), getDashboardData()]);
   const totalOfficers = Array.from(rankCounts.values()).reduce((a, b) => a + b, 0) || 1;
   const { rows: performanceRows, topSucesso } = arrestPerformance;
+  const { rows: heistRows, topSr } = heistPerformance;
 
   return (
     <section className="space-y-6">
@@ -146,6 +154,52 @@ export default async function DashboardPage() {
                     <td className="py-2 px-4 text-right text-rose-400 font-bold">{row.falha}</td>
                     <td className="py-2 px-4 text-right text-slate-300">{row.sucessoPct}%</td>
                     <td className="py-2 pl-4 text-right text-slate-300">{row.falhaPct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-rocam-card p-5 rounded-xl border border-rocam-border space-y-4">
+        <div className="flex items-center justify-between border-b border-rocam-border pb-3 flex-wrap gap-2">
+          <h3 className="font-oswald text-base font-bold text-slate-200 flex items-center gap-2">
+            <Siren className="w-4 h-4 text-rocam-yellow" /> DESEMPENHO EM AÇÕES
+          </h3>
+          {topSr && (
+            <p className="text-xs text-slate-300">
+              Melhor SR:{" "}
+              <span className="text-rocam-yellow font-bold">{topSr.displayName}</span>{" "}
+              <span className="text-rocam-muted">({topSr.srPct}%)</span>
+            </p>
+          )}
+        </div>
+
+        {heistRows.length === 0 ? (
+          <p className="text-rocam-muted italic py-4 text-center text-sm">
+            Nenhum oficial com ações registradas ainda.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-rocam-muted uppercase tracking-wider text-left border-b border-rocam-border">
+                  <th className="py-2 pr-4 font-semibold">Oficial</th>
+                  <th className="py-2 px-4 font-semibold text-right">Total</th>
+                  <th className="py-2 px-4 font-semibold text-right">Vitórias</th>
+                  <th className="py-2 px-4 font-semibold text-right">Derrotas</th>
+                  <th className="py-2 pl-4 font-semibold text-right">SR%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {heistRows.map((row) => (
+                  <tr key={row.userId} className="border-b border-rocam-border/50 last:border-0">
+                    <td className="py-2 pr-4 text-slate-200 font-semibold">{row.displayName}</td>
+                    <td className="py-2 px-4 text-right text-slate-300">{row.total}</td>
+                    <td className="py-2 px-4 text-right text-emerald-400 font-bold">{row.vitorias}</td>
+                    <td className="py-2 px-4 text-right text-rose-400 font-bold">{row.derrotas}</td>
+                    <td className="py-2 pl-4 text-right text-slate-300">{row.srPct}%</td>
                   </tr>
                 ))}
               </tbody>

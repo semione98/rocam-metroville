@@ -3,13 +3,9 @@ import { prisma } from "@/lib/db";
 import { requireUser, withApiErrorHandling } from "@/lib/api-auth";
 import { heistSchema } from "@/lib/schemas";
 import { logActivity } from "@/lib/activity-log";
-import { rosterSelect } from "@/lib/roster";
 import { parseDateOnly } from "@/lib/date-only";
+import { assertRosterUserIds, heistInclude } from "@/lib/heists";
 import { HEIST_KIND_LABELS, HEIST_OUTCOME_LABELS } from "@/components/acoes/heist-types";
-
-const heistInclude = {
-  officers: { include: { user: { select: rosterSelect } } },
-} as const;
 
 export const GET = withApiErrorHandling(async () => {
   await requireUser();
@@ -23,7 +19,10 @@ export const GET = withApiErrorHandling(async () => {
 export const POST = withApiErrorHandling(async (req) => {
   const actor = await requireUser();
   const body = heistSchema.parse(await req.json());
+  // The creator always counts as a participant, even if they forgot to tick
+  // themselves — that's how they get credited in the SR% metric.
   const userIds = [...new Set([...body.userIds, actor.id])];
+  await assertRosterUserIds(body.userIds);
 
   const heist = await prisma.heist.create({
     data: {

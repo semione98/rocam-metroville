@@ -33,8 +33,15 @@ export const heistSchema = z.object({
   name: z.string().trim().min(1, "Nome da ação obrigatório"),
   kind: z.enum(HeistKind),
   outcome: z.enum(HeistOutcome),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
-  userIds: z.array(z.string()).default([]),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida")
+    .refine((v) => {
+      const [y, m, d] = v.split("-").map(Number);
+      const parsed = new Date(Date.UTC(y, m - 1, d));
+      return parsed.getUTCFullYear() === y && parsed.getUTCMonth() === m - 1 && parsed.getUTCDate() === d;
+    }, "Data inválida"),
+  userIds: z.array(z.string().trim().min(1)).max(100).default([]),
 });
 
 /** `evaluatorTarget` (display name) is intentionally NOT accepted from the
