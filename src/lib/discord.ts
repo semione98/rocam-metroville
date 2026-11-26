@@ -72,6 +72,97 @@ export async function fetchGuildMember(
   return (await res.json()) as DiscordGuildMember;
 }
 
+/** Thrown when membership cannot be confirmed or a kick cannot be completed. */
+export class DiscordMemberRemovalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DiscordMemberRemovalError";
+  }
+}
+
+function requireDiscordBotConfig(): { botToken: string; guildId: string } {
+  const botToken = process.env.DISCORD_BOT_TOKEN;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!botToken || !guildId) {
+    throw new DiscordMemberRemovalError(
+      "Integração com o Discord não configurada (bot ou servidor da unidade)."
+    );
+  }
+  return { botToken, guildId };
+}
+
+/**
+ * Confirms the user is still in the unit guild and kicks them if so.
+ * A 404 means they already left — that is not an error.
+ * Any other Discord failure throws so the caller can abort the site deletion.
+ */
+export async function removeGuildMemberIfPresent(
+  discordUserId: string
+): Promise<"removed" | "absent"> {
+  const { botToken, guildId } = requireDiscordBotConfig();
+  const memberUrl = `https://discord.com/api/v10/guilds/${guildId}/members/${discordUserId}`;
+  const headers = { Authorization: `Bot ${botToken}` };
+
+  let memberRes: Response;
+  try {
+    memberRes = await fetch(memberUrl, { headers, cache: "no-store" });
+  } catch (err) {
+    console.error("[discord] Erro de rede ao verificar membro da guild.", err);
+    throw new DiscordMemberRemovalError(
+      "Não foi possível consultar o Discord da unidade. A conta não foi excluída."
+    );
+  }
+
+  if (memberRes.status === 404) return "absent";
+
+  if (!memberRes.ok) {
+    console.error(
+      `[discord] Falha ao verificar membro da guild (status ${memberRes.status}): ${await memberRes
+        .text()
+        .catch(() => "")}`
+    );
+    throw new DiscordMemberRemovalError(
+      "Não foi possível confirmar se o usuário ainda está no Discord. A conta não foi excluída."
+    );
+  }
+
+  let kickRes: Response;
+  try {
+    kickRes = await fetch(memberUrl, {
+      method: "DELETE",
+      headers: {
+        ...headers,
+        "X-Audit-Log-Reason": encodeURIComponent(
+          "Removido do efetivo pelo painel ROCAM"
+        ),
+      },
+      cache: "no-store",
+    });
+  } catch (err) {
+    console.error("[discord] Erro de rede ao expulsar membro da guild.", err);
+    throw new DiscordMemberRemovalError(
+      "O usuário está no Discord, mas a expulsão falhou por erro de rede. A conta não foi excluída."
+    );
+  }
+
+  if (kickRes.status === 204 || kickRes.status === 404) return "removed";
+
+  const body = await kickRes.text().catch(() => "");
+  console.error(
+    `[discord] Falha ao expulsar membro da guild (status ${kickRes.status}): ${body}`
+  );
+
+  if (kickRes.status === 403) {
+    throw new DiscordMemberRemovalError(
+      "O bot não conseguiu expulsar esse membro. Ele precisa da permissão Expulsar Membros e de um cargo acima do cargo da pessoa. A conta não foi excluída."
+    );
+  }
+
+  throw new DiscordMemberRemovalError(
+    "O usuário está no Discord, mas não foi possível expulsá-lo. A conta não foi excluída."
+  );
+}
+
 /**
  * Posts a plain text message to a channel using the Discord Bot Token.
  * Never throws — logs and returns `false` on failure so a Discord outage

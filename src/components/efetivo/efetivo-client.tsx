@@ -99,14 +99,23 @@ export function EfetivoClient({ initialOfficers }: { initialOfficers: RosterMemb
   async function handleDelete(o: RosterMember) {
     if (
       !confirm(
-        `Remover ${resolveDisplayName(o)} do efetivo? Isso remove também a conta/login dessa pessoa — se ela entrar de novo com Discord, terá que refazer o cadastro inicial.`
+        `Remover ${resolveDisplayName(o)} do efetivo? A conta será excluída e, se a pessoa ainda estiver no Discord da unidade, ela será removida do servidor. Se entrar de novo, terá que refazer o cadastro inicial.`
       )
     )
       return;
     try {
       const res = await fetch(`/api/officers/${o.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Falha ao remover oficial.");
-      showToast("Oficial removido.", "info");
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        discordRemoval?: "removed" | "absent";
+      };
+      if (!res.ok) throw new Error(data.error ?? "Falha ao remover oficial.");
+      showToast(
+        data.discordRemoval === "removed"
+          ? "Oficial removido do efetivo e do Discord da unidade."
+          : "Oficial removido. Ele já não estava no Discord da unidade.",
+        "info"
+      );
       router.refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Erro ao remover oficial.", "error");
