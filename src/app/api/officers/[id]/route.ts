@@ -38,6 +38,7 @@ export const PATCH = withApiErrorHandling(async (req) => {
   return NextResponse.json(officer);
 });
 
+// Discord membership is resolved before the local account is removed.
 export const DELETE = withApiErrorHandling(async (req) => {
   const actor = await requireRank(Rank.SUPERVISOR);
   const id = new URL(req.url).pathname.split("/").pop()!;
